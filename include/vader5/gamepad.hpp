@@ -17,7 +17,7 @@ struct TapHoldState {
 
 class Gamepad {
   public:
-    static auto open(const Config& cfg) -> Result<Gamepad>;
+    static auto open(const Config& cfg, const std::string& device_name) -> Result<Gamepad>;
     ~Gamepad();
 
     Gamepad(Gamepad&&) = default;

@@ -46,23 +46,9 @@ install_bin() {
 
 install_systemd() {
     info "Installing systemd service (requires sudo)..."
-    cat << 'EOF' | sudo tee /etc/systemd/system/vader5d.service > /dev/null
-[Unit]
-Description=Flydigi Vader 5 Pro Driver
-After=multi-user.target
-
-[Service]
-Type=simple
-ExecStart=/usr/local/bin/vader5d
-Restart=on-failure
-RestartSec=3
-
-[Install]
-WantedBy=multi-user.target
-EOF
+    sudo cp "$SCRIPT_DIR/vader5d@.service" /etc/systemd/system/vader5d@.service
     sudo systemctl daemon-reload
     success "systemd service installed"
-    echo "    Enable with: sudo systemctl enable --now vader5d"
 }
 
 uninstall() {
@@ -70,9 +56,11 @@ uninstall() {
     sudo systemctl stop vader5d 2>/dev/null || true
     sudo systemctl disable vader5d 2>/dev/null || true
     sudo rm -f /etc/systemd/system/vader5d.service
+    sudo rm -f /etc/systemd/system/vader5d@.service
     sudo rm -f /usr/local/bin/vader5d /usr/local/bin/vader5-debug
     sudo rm -f "$UDEV_RULES"
     sudo udevadm control --reload-rules
+    sudo systemctl daemon-reload
     success "Uninstalled"
 }
 

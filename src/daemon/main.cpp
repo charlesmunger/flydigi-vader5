@@ -31,11 +31,16 @@ auto main(int argc, char* argv[]) -> int {
     (void)std::signal(SIGTERM, handle_signal);
 
     std::string config_path = vader5::Config::default_path();
+    std::string device_name;
     const std::span args(argv, static_cast<size_t>(argc)); // NOLINT
     for (size_t i = 1; i < args.size(); ++i) {
         if ((std::strcmp(args[i], "-c") == 0 || std::strcmp(args[i], "--config") == 0) &&
             i + 1 < args.size()) {
             config_path = args[++i];
+        }
+        if ((std::strcmp(args[i], "-d") == 0 || std::strcmp(args[i], "--device") == 0) &&
+            i + 1 < args.size()) {
+            device_name = args[++i];
         }
     }
 
@@ -51,7 +56,7 @@ auto main(int argc, char* argv[]) -> int {
                              vader5::VENDOR_ID, vader5::PRODUCT_ID);
 
     while (g_running.load(std::memory_order_relaxed)) {
-        auto gamepad = vader5::Gamepad::open(cfg);
+        auto gamepad = vader5::Gamepad::open(cfg, device_name);
         if (!gamepad) {
             std::this_thread::sleep_for(RETRY_INTERVAL);
             continue;
@@ -66,7 +71,8 @@ auto main(int argc, char* argv[]) -> int {
         while (g_running.load(std::memory_order_relaxed)) {
             const int ret = poll(pfds.data(), pfds.size(), POLL_TIMEOUT_MS);
             if (ret < 0 && errno != EINTR) {
-                std::cerr << std::format("vader5d: poll error: {}\n", std::strerror(errno));
+	        const int err = errno;
+                std::cerr << std::format("vader5d: poll error: {}\n", std::strerror(err));
                 break;
             }
 
