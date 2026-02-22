@@ -12,10 +12,27 @@
 namespace vader5 {
 namespace {
 
-inline void write_event(int fd, const input_event& ev) {
-    if (::write(fd, &ev, sizeof(ev)) < 0) {
+inline auto sync(std::vector<input_event>& events, int fd) -> Result<void> {
+    if (!events.empty()) {
+        input_event event{};
+        event.type = EV_SYN;
+        event.code = SYN_REPORT;
+        events.push_back(event);
+        auto buffer = std::as_bytes(std::span{events});
+        while (!buffer.empty()) {
+            ssize_t result = ::write(fd, buffer.data(), buffer.size());
+            if (result < 0) {
+                int err = errno;
+                events.clear();
+                return std::unexpected(std::error_code(err, std::system_category()));
+            }
+            buffer = buffer.subspan(result);
+        }
+        events.clear();
     }
+    return {};
 }
+
 constexpr int AXIS_MIN = -32768;
 constexpr int AXIS_MAX = 32767;
 constexpr int AXIS_FUZZ = 16;
@@ -35,11 +52,20 @@ constexpr std::array<int, 8> DEFAULT_EXT_CODES = {
 };
 } // namespace
 
+inline void Uinput::buffer_event(const input_event& ev) {
+    events_buffer_.push_back(ev);
+}
+
+inline void InputDevice::buffer_event(const input_event& ev) {
+    events_buffer_.push_back(ev);
+}
+
 auto Uinput::create(std::span<const std::optional<int>> ext_mappings,
                     const char* name) -> Result<Uinput> {
     const int file_descriptor = ::open("/dev/uinput", O_RDWR | O_NONBLOCK);
     if (file_descriptor < 0) {
-        return std::unexpected(std::error_code(errno, std::system_category()));
+        int err = errno;
+        return std::unexpected(std::error_code(err, std::system_category()));
     }
 
     (void)ioctl(file_descriptor, UI_SET_EVBIT, EV_KEY);
@@ -153,27 +179,24 @@ auto Uinput::operator=(Uinput&& other) noexcept -> Uinput& {
     return *this;
 }
 
-void Uinput::emit_key(int code, int value) const {
+void Uinput::emit_key(int code, int value) {
     input_event event{};
     event.type = EV_KEY;
     event.code = static_cast<uint16_t>(code);
     event.value = value;
-    write_event(fd_, event);
+    buffer_event(event);
 }
 
-void Uinput::emit_abs(int code, int value) const {
+void Uinput::emit_abs(int code, int value) {
     input_event event{};
     event.type = EV_ABS;
     event.code = static_cast<uint16_t>(code);
     event.value = value;
-    write_event(fd_, event);
+    buffer_event(event);
 }
 
-void Uinput::sync() const {
-    input_event event{};
-    event.type = EV_SYN;
-    event.code = SYN_REPORT;
-    write_event(fd_, event);
+auto Uinput::sync() -> Result<void> {
+    return ::vader5::sync(events_buffer_, fd_);
 }
 
 namespace {
@@ -191,7 +214,7 @@ auto is_dpad_right(uint8_t dpad) -> bool {
 }
 } // namespace
 
-auto Uinput::emit(const GamepadState& state, const GamepadState& prev) const -> Result<void> {
+auto Uinput::emit(const GamepadState& state, const GamepadState& prev) -> Result<void> {
     if (state.left_x != prev.left_x) {
         emit_abs(ABS_X, state.left_x);
     }
@@ -277,8 +300,7 @@ auto Uinput::emit(const GamepadState& state, const GamepadState& prev) const -> 
         }
     }
 
-    sync();
-    return {};
+    return sync();
 }
 
 auto Uinput::poll_ff() -> std::optional<RumbleEffect> {
@@ -405,7 +427,7 @@ auto InputDevice::operator=(InputDevice&& other) noexcept -> InputDevice& {
     return *this;
 }
 
-void InputDevice::emit_rel(int code, int value) const {
+void InputDevice::emit_rel(int code, int value) {
     if (value == 0) {
         return;
     }
@@ -413,40 +435,37 @@ void InputDevice::emit_rel(int code, int value) const {
     event.type = EV_REL;
     event.code = static_cast<uint16_t>(code);
     event.value = value;
-    write_event(fd_, event);
+    buffer_event(event);
 }
 
-void InputDevice::emit_key(int code, int value) const {
+void InputDevice::emit_key(int code, int value) {
     input_event event{};
     event.type = EV_KEY;
     event.code = static_cast<uint16_t>(code);
     event.value = value;
-    write_event(fd_, event);
+    buffer_event(event);
 }
 
-void InputDevice::move_mouse(int dx, int dy) const {
+void InputDevice::move_mouse(int dx, int dy) {
     emit_rel(REL_X, dx);
     emit_rel(REL_Y, dy);
 }
 
-void InputDevice::scroll(int vertical, int horizontal) const {
+void InputDevice::scroll(int vertical, int horizontal) {
     emit_rel(REL_WHEEL, vertical);
     emit_rel(REL_HWHEEL, horizontal);
 }
 
-void InputDevice::click(int code, bool pressed) const {
+void InputDevice::click(int code, bool pressed) {
     emit_key(code, pressed ? 1 : 0);
 }
 
-void InputDevice::key(int code, bool pressed) const {
+void InputDevice::key(int code, bool pressed) {
     emit_key(code, pressed ? 1 : 0);
 }
 
-void InputDevice::sync() const {
-    input_event event{};
-    event.type = EV_SYN;
-    event.code = SYN_REPORT;
-    write_event(fd_, event);
+auto InputDevice::sync() -> Result<void> {
+    return ::vader5::sync(events_buffer_, fd_);
 }
 
 } // namespace vader5

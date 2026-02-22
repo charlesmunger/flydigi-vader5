@@ -3,9 +3,12 @@
 #include "config.hpp"
 #include "types.hpp"
 
+#include <linux/input.h>
+
 #include <array>
 #include <optional>
 #include <span>
+#include <vector>
 
 namespace vader5 {
 
@@ -28,8 +31,8 @@ class Uinput {
     [[nodiscard]] auto fd() const noexcept -> int {
         return fd_;
     }
-    auto emit(const GamepadState& state, const GamepadState& prev) const -> Result<void>;
-    void sync() const;
+    auto emit(const GamepadState& state, const GamepadState& prev) -> Result<void>;
+    auto sync() -> Result<void>;
     auto poll_ff() -> std::optional<RumbleEffect>;
 
   private:
@@ -37,9 +40,11 @@ class Uinput {
     int fd_{-1};
     std::array<std::optional<int>, 8> ext_mappings_{};
     std::array<RumbleEffect, 16> ff_effects_{};
+    std::vector<input_event> events_buffer_{};
 
-    void emit_key(int code, int value) const;
-    void emit_abs(int code, int value) const;
+    void emit_key(int code, int value);
+    void emit_abs(int code, int value);
+    inline void buffer_event(const input_event& ev);
 };
 
 // Separate device for mouse/keyboard to avoid Steam detection issues
@@ -53,18 +58,20 @@ class InputDevice {
     InputDevice(const InputDevice&) = delete;
     auto operator=(const InputDevice&) -> InputDevice& = delete;
 
-    void move_mouse(int dx, int dy) const;
-    void scroll(int vertical, int horizontal = 0) const;
-    void click(int code, bool pressed) const;
-    void key(int code, bool pressed) const;
-    void sync() const;
+    void move_mouse(int dx, int dy);
+    void scroll(int vertical, int horizontal = 0);
+    void click(int code, bool pressed);
+    void key(int code, bool pressed);
+    auto sync() -> Result<void>;
 
   private:
     explicit InputDevice(int fd) : fd_(fd) {}
     int fd_{-1};
+    std::vector<input_event> events_buffer_{};
 
-    void emit_rel(int code, int value) const;
-    void emit_key(int code, int value) const;
+    void emit_rel(int code, int value);
+    void emit_key(int code, int value);
+    inline void buffer_event(const input_event& ev);
 };
 
 } // namespace vader5
