@@ -22,14 +22,10 @@ void handle_signal(int /*signum*/) {
     g_running.store(false, std::memory_order_relaxed);
 }
 
-constexpr int POLL_TIMEOUT_MS = 100;
 constexpr auto RETRY_INTERVAL = std::chrono::seconds(2);
 } // namespace
 
 auto main(int argc, char* argv[]) -> int {
-    (void)std::signal(SIGINT, handle_signal);
-    (void)std::signal(SIGTERM, handle_signal);
-
     std::string config_path = vader5::Config::default_path();
     std::string device_name;
     const std::span args(argv, static_cast<size_t>(argc)); // NOLINT
@@ -54,6 +50,19 @@ auto main(int argc, char* argv[]) -> int {
     std::cout << std::format("vader5d: Waiting for Vader 5 Pro (VID:{:04x} PID:{:04x})...\n",
                              vader5::VENDOR_ID, vader5::PRODUCT_ID);
 
+    struct sigaction sa{};
+    sa.sa_handler = handle_signal;
+    sigaction(SIGTERM, &sa, nullptr);
+    sigaction(SIGINT, &sa, nullptr);
+
+    sigset_t empty_mask;
+    sigemptyset(&empty_mask);
+
+    sigset_t block_mask;
+    sigemptyset(&block_mask);
+    sigaddset(&block_mask, SIGTERM);
+    sigaddset(&block_mask, SIGINT);
+
     while (g_running.load(std::memory_order_relaxed)) {
         auto gamepad = vader5::Gamepad::open(cfg, device_name);
         if (!gamepad) {
@@ -67,14 +76,19 @@ auto main(int argc, char* argv[]) -> int {
             {.fd = gamepad->ff_fd(), .events = POLLIN, .revents = 0},
         }};
 
+        // Block signals except when we're polling, which allows an indefinite poll without a race
+        // where we may miss a signal
+        sigset_t old_mask;
+        sigprocmask(SIG_BLOCK, &block_mask, &old_mask);
+
         while (g_running.load(std::memory_order_relaxed)) {
-            const int ret = poll(pfds.data(), pfds.size(), POLL_TIMEOUT_MS);
+            const int ret = ppoll(pfds.data(), pfds.size(), nullptr, &empty_mask);
             if (ret < 0) {
                 const int err = errno;
                 if (err != EINTR) {
                     std::cerr << std::format("vader5d: poll error: {}\n", std::strerror(err));
-                    break;
                 }
+                break;
             }
 
             if (ret > 0 && (pfds[0].revents & POLLIN) != 0) {
@@ -101,6 +115,7 @@ auto main(int argc, char* argv[]) -> int {
                 break;
             }
         }
+        sigprocmask(SIG_SETMASK, &old_mask, nullptr);
 
         std::cout << "vader5d: Waiting for reconnection...\n";
     }
