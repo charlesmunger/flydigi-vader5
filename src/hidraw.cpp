@@ -98,7 +98,8 @@ auto Hidraw::operator=(Hidraw&& other) noexcept -> Hidraw& {
 
 auto Hidraw::phys() const -> Result<std::string> {
     std::string path;
-    for (size_t buf_size = 256; buf_size <= INT_MAX; buf_size *= 2) {
+    size_t buf_size = 256;
+    while (buf_size <= _IOC_SIZEMASK) {
         path.resize(buf_size, '\0');
         int len = ioctl(fd_, HIDIOCGRAWPHYS(buf_size), path.data());
         if (len < 0) {
@@ -106,9 +107,17 @@ auto Hidraw::phys() const -> Result<std::string> {
             return std::unexpected(std::error_code(err, std::system_category()));
         }
         if (std::cmp_less(len, buf_size)) {
-            path.resize(len - 1);
+            if (len == 0) {
+                path.resize(0);
+            } else {
+                path.resize(len - 1);
+            }
             return path;
         }
+        if (buf_size == _IOC_SIZEMASK) {
+            break;
+        }
+        buf_size = std::min(buf_size * 2, static_cast<size_t>(_IOC_SIZEMASK));
     }
     return std::unexpected(std::make_error_code(std::errc::filename_too_long));
 }

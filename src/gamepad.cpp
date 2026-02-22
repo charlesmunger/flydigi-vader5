@@ -192,7 +192,7 @@ auto block_redundant_input(const Hidraw& hidraw) -> Result<UniqueFd> {
     }
     UniqueFd result(fd);
     // Exclusively grab this input device. Until our process dies or this file descriptor is closed,
-    // all other attempts to read from this input will not recieve any events, which prevents
+    // all other attempts to read from this input will not receive any events, which prevents
     // double-events for games that listen to multiple controllers.
     if (ioctl(fd, EVIOCGRAB, 1) < 0) {
         const int err = errno;
@@ -231,6 +231,7 @@ auto Gamepad::open(const Config& cfg, const std::string& device_name) -> Result<
 
     auto redundant = block_redundant_input(*hid);
     if (!redundant) {
+        send_test_mode(*hid, false);
         return std::unexpected(redundant.error());
     }
 

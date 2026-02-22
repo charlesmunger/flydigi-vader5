@@ -48,7 +48,7 @@ class Gamepad {
     ~Gamepad();
 
     Gamepad(Gamepad&&) = default;
-    Gamepad& operator=(Gamepad&&) = default;
+    Gamepad& operator=(Gamepad&&) = delete;
     Gamepad(const Gamepad&) = delete;
     Gamepad& operator=(const Gamepad&) = delete;
 
