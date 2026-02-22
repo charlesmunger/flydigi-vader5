@@ -56,6 +56,7 @@ install_systemd() {
     sudo systemctl daemon-reload
     sudo udevadm control --reload-rules
     trigger_udev
+    sudo systemctl try-restart system-vader5d.slice
     success "systemd service installed"
 }
 
