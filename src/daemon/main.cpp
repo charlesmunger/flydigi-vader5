@@ -50,7 +50,7 @@ auto main(int argc, char* argv[]) -> int {
     std::cout << std::format("vader5d: Waiting for Vader 5 Pro (VID:{:04x} PID:{:04x})...\n",
                              vader5::VENDOR_ID, vader5::PRODUCT_ID);
 
-    struct sigaction sa{};
+    struct sigaction sa {};
     sa.sa_handler = handle_signal;
     sigaction(SIGTERM, &sa, nullptr);
     sigaction(SIGINT, &sa, nullptr);
@@ -85,9 +85,10 @@ auto main(int argc, char* argv[]) -> int {
             const int ret = ppoll(pfds.data(), pfds.size(), nullptr, &empty_mask);
             if (ret < 0) {
                 const int err = errno;
-                if (err != EINTR) {
-                    std::cerr << std::format("vader5d: poll error: {}\n", std::strerror(err));
+                if (err == EINTR) {
+                    continue;
                 }
+                std::cerr << std::format("vader5d: poll error: {}\n", std::strerror(err));
                 break;
             }
 
