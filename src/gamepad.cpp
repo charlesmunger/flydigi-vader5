@@ -146,7 +146,7 @@ auto needs_mouse(const Config& cfg) -> bool {
     return false;
 }
 
-auto find_input_device(const std::string& base_path) -> std::optional<std::string> {
+auto find_input_device(const std::string& match_phys) -> std::optional<std::string> {
     std::string input_path;
     for (const auto& entry : fs::directory_iterator("/sys/class/input")) {
         if (!entry.path().filename().string().starts_with("event")) {
@@ -160,7 +160,7 @@ auto find_input_device(const std::string& base_path) -> std::optional<std::strin
         if (!std::getline(phys, input_path)) {
             continue;
         }
-        if (input_path.starts_with(base_path)) {
+        if (input_path == match_phys) {
             return "/dev/input/" + entry.path().filename().string();
         }
         input_path.clear();
