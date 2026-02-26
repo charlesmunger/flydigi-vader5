@@ -51,15 +51,22 @@ auto find_hidraw_device(uint16_t vid, uint16_t pid, int iface_num) -> Result<std
     return std::unexpected(std::make_error_code(std::errc::no_such_device));
 }
 
-auto Hidraw::open(uint16_t vid, uint16_t pid, int iface) -> Result<Hidraw> {
-    auto path = find_hidraw_device(vid, pid, iface);
-    if (!path) {
-        return std::unexpected(path.error());
+auto Hidraw::open(uint16_t vid, uint16_t pid, int iface,
+                  const std::string& device_name) -> Result<Hidraw> {
+    Result<std::string> path;
+    if (device_name.empty()) {
+        path = find_hidraw_device(vid, pid, iface);
+        if (!path) {
+            return std::unexpected(path.error());
+        }
+    } else {
+        path = "/dev/" + device_name;
     }
 
     const int fd = ::open(path->c_str(), O_RDWR | O_NONBLOCK);
     if (fd < 0) {
-        return std::unexpected(std::error_code(errno, std::system_category()));
+        const int err = errno;
+        return std::unexpected(std::error_code(err, std::system_category()));
     }
 
     return Hidraw(fd);
@@ -89,7 +96,8 @@ auto Hidraw::operator=(Hidraw&& other) noexcept -> Hidraw& {
 auto Hidraw::read(std::span<uint8_t> buf) const -> Result<size_t> {
     const auto bytes = ::read(fd_, buf.data(), buf.size());
     if (bytes < 0) {
-        return std::unexpected(std::error_code(errno, std::system_category()));
+        int err = errno;
+        return std::unexpected(std::error_code(err, std::system_category()));
     }
     return static_cast<size_t>(bytes);
 }
@@ -97,7 +105,8 @@ auto Hidraw::read(std::span<uint8_t> buf) const -> Result<size_t> {
 auto Hidraw::write(std::span<const uint8_t> buf) const -> Result<size_t> {
     const auto bytes = ::write(fd_, buf.data(), buf.size());
     if (bytes < 0) {
-        return std::unexpected(std::error_code(errno, std::system_category()));
+        int err = errno;
+        return std::unexpected(std::error_code(err, std::system_category()));
     }
     return static_cast<size_t>(bytes);
 }

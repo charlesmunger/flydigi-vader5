@@ -10,7 +10,7 @@ namespace vader5 {
 
 class Hidraw {
   public:
-    static auto open(uint16_t vid, uint16_t pid, int iface = 0) -> Result<Hidraw>;
+    static auto open(uint16_t vid, uint16_t pid, int iface = 0, const std::string& device_name = "") -> Result<Hidraw>;
     ~Hidraw();
 
     Hidraw(Hidraw&& other) noexcept;

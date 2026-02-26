@@ -5,7 +5,6 @@ SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 PROJECT_DIR="$(dirname "$SCRIPT_DIR")"
 BUILD_DIR="$PROJECT_DIR/build"
 CONFIG_DIR="$HOME/.config/vader5"
-UDEV_RULES="/etc/udev/rules.d/99-vader5.rules"
 
 info() { echo -e "\033[1;34m==>\033[0m $1"; }
 success() { echo -e "\033[1;32m==>\033[0m $1"; }
@@ -18,11 +17,17 @@ build() {
     success "Build complete"
 }
 
+trigger_udev() {
+    for dev in $(udevadm trigger --dry-run --verbose --subsystem-match=usb --attr-match=idVendor=37d7 --attr-match=idProduct=2401); do
+        sudo udevadm trigger -c add --subsystem-match=hidraw --parent-match="$dev";
+    done
+}
+
 install_udev() {
     info "Installing udev rules (requires sudo)..."
-    sudo cp "$SCRIPT_DIR/99-vader5.rules" "$UDEV_RULES"
+    sudo cp -t /etc/udev/rules.d/ "$SCRIPT_DIR/99-vader5.rules"
     sudo udevadm control --reload-rules
-    sudo udevadm trigger
+    trigger_udev
     success "udev rules installed"
 }
 
@@ -46,33 +51,24 @@ install_bin() {
 
 install_systemd() {
     info "Installing systemd service (requires sudo)..."
-    cat << 'EOF' | sudo tee /etc/systemd/system/vader5d.service > /dev/null
-[Unit]
-Description=Flydigi Vader 5 Pro Driver
-After=multi-user.target
-
-[Service]
-Type=simple
-ExecStart=/usr/local/bin/vader5d
-Restart=on-failure
-RestartSec=3
-
-[Install]
-WantedBy=multi-user.target
-EOF
+    sudo cp -t /etc/systemd/system/ "$SCRIPT_DIR/vader5d@.service"
+    sudo cp -t /etc/udev/rules.d/ "$SCRIPT_DIR/99-vader5-systemd.rules" 
     sudo systemctl daemon-reload
+    sudo udevadm control --reload-rules
+    trigger_udev
+    sudo systemctl try-restart system-vader5d.slice
     success "systemd service installed"
-    echo "    Enable with: sudo systemctl enable --now vader5d"
 }
 
 uninstall() {
     info "Uninstalling..."
-    sudo systemctl stop vader5d 2>/dev/null || true
-    sudo systemctl disable vader5d 2>/dev/null || true
+    sudo systemctl stop system-vader5d.slice 2>/dev/null || true
     sudo rm -f /etc/systemd/system/vader5d.service
+    sudo rm -f /etc/systemd/system/vader5d@.service
     sudo rm -f /usr/local/bin/vader5d /usr/local/bin/vader5-debug
-    sudo rm -f "$UDEV_RULES"
+    sudo rm -f /etc/udev/rules.d/99-vader5.rules /etc/udev/rules.d/99-vader5-systemd.rules
     sudo udevadm control --reload-rules
+    sudo systemctl daemon-reload
     success "Uninstalled"
 }
 

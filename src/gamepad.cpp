@@ -137,8 +137,8 @@ auto needs_mouse(const Config& cfg) -> bool {
 }
 } // namespace
 
-auto Gamepad::open(const Config& cfg) -> Result<Gamepad> {
-    auto hid = Hidraw::open(VENDOR_ID, PRODUCT_ID, CONFIG_INTERFACE);
+auto Gamepad::open(const Config& cfg, const std::string& device_name) -> Result<Gamepad> {
+    auto hid = Hidraw::open(VENDOR_ID, PRODUCT_ID, CONFIG_INTERFACE, device_name);
     if (!hid) {
         return std::unexpected(hid.error());
     }
