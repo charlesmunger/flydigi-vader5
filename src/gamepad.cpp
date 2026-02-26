@@ -332,14 +332,14 @@ void Gamepad::emit_tap(const RemapTarget& tap) {
     }
     if (tap.type == RemapTarget::Key) {
         input_->key(tap.code, true);
-        input_->sync();
+        [[maybe_unused]] auto r1 = input_->sync();
         input_->key(tap.code, false);
-        input_->sync();
+        [[maybe_unused]] auto r2 = input_->sync();
     } else if (tap.type == RemapTarget::MouseButton) {
         input_->click(tap.code, true);
-        input_->sync();
+        [[maybe_unused]] auto r1 = input_->sync();
         input_->click(tap.code, false);
-        input_->sync();
+        [[maybe_unused]] auto r2 = input_->sync();
     }
 }
 
@@ -496,7 +496,7 @@ void Gamepad::process_gyro(const GamepadState& state) {
         gyro_accum_x_ -= static_cast<float>(dx);
         gyro_accum_y_ -= static_cast<float>(dy);
         input_->move_mouse(dx, dy);
-        input_->sync();
+        [[maybe_unused]] auto r1 = input_->sync();
     }
 }
 
@@ -524,7 +524,7 @@ void Gamepad::process_mouse_stick(const GamepadState& state) {
 
     if (dx != 0 || dy != 0) {
         input_->move_mouse(dx, dy);
-        input_->sync();
+        [[maybe_unused]] auto r1 = input_->sync();
     }
 }
 
@@ -558,7 +558,7 @@ void Gamepad::process_scroll_stick(const GamepadState& state) {
         scroll_accum_v_ -= static_cast<float>(scroll_v);
         scroll_accum_h_ -= static_cast<float>(scroll_h);
         input_->scroll(scroll_v, scroll_h);
-        input_->sync();
+        [[maybe_unused]] auto r1 = input_->sync();
     }
 }
 
@@ -603,7 +603,7 @@ void Gamepad::process_layer_dpad(const GamepadState& state) {
     update_key(dpad_right_, want_right, KEY_RIGHT);
 
     if (changed) {
-        input_->sync();
+        [[maybe_unused]] auto r1 = input_->sync();
     }
 }
 
@@ -652,10 +652,10 @@ void Gamepad::process_base_remaps(const GamepadState& state, const GamepadState&
 
         if (target.type == RemapTarget::Key) {
             input_->key(target.code, curr);
-            input_->sync();
+            [[maybe_unused]] auto r1 = input_->sync();
         } else if (target.type == RemapTarget::MouseButton) {
             input_->click(target.code, curr);
-            input_->sync();
+            [[maybe_unused]] auto r1 = input_->sync();
         }
     }
 }
@@ -698,10 +698,10 @@ void Gamepad::process_layer_buttons(const GamepadState& state, const GamepadStat
 
         if (target.type == RemapTarget::MouseButton) {
             input_->click(target.code, curr);
-            input_->sync();
+            [[maybe_unused]] auto r1 = input_->sync();
         } else if (target.type == RemapTarget::Key) {
             input_->key(target.code, curr);
-            input_->sync();
+            [[maybe_unused]] auto r1 = input_->sync();
         }
     }
 }
