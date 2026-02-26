@@ -14,6 +14,7 @@
 #include <filesystem>
 #include <format>
 #include <fstream>
+#include <iostream>
 #include <thread>
 
 namespace vader5 {
@@ -233,8 +234,10 @@ auto Gamepad::open(const Config& cfg, const std::string& device_name) -> Result<
 
     auto redundant = block_redundant_input(*hid);
     if (!redundant) {
-        send_test_mode(*hid, false);
-        return std::unexpected(redundant.error());
+        std::cerr << std::format(
+            "vader5d: warning: failed to suppress redundant input device: {}\n",
+            redundant.error().message());
+        return Gamepad(std::move(*hid), std::move(*uinput), std::move(input), UniqueFd(-1), cfg);
     }
 
     return Gamepad(std::move(*hid), std::move(*uinput), std::move(input), std::move(*redundant),
